@@ -1,6 +1,6 @@
 import type { AnomalyRecord, BasinSummary, CopilotResponse, ExecutiveSummary, OperatorRisk, PortfolioSummary, Recommendation, WellAnalysis, WellSummary } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`);

@@ -20,10 +20,21 @@ from app.services.persistence_service import persistence_service
 router = APIRouter()
 
 
+def _production_df():
+    try:
+        with SessionLocal() as db:
+            persisted = persistence_service.load_dataframe(db)
+            if not persisted.empty:
+                return persisted
+    except Exception:
+        pass
+    return data_service.dataframe
+
+
 def _summaries(oil_price: Optional[float] = None, threshold: Optional[float] = None):
     settings = get_settings()
     return analysis_service.analyze_portfolio(
-        data_service.dataframe,
+        _production_df(),
         oil_price or settings.default_oil_price,
         threshold or settings.default_decline_threshold,
     )
@@ -46,6 +57,11 @@ async def upload_production_data(file: UploadFile = File(...)) -> UploadResponse
             tmp.write(content)
             tmp.flush()
             result = data_service.load_csv(tmp.name)
+        try:
+            with SessionLocal() as db:
+                persistence_service.replace_production_dataset(db, result.dataframe)
+        except Exception:
+            pass
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return UploadResponse(
@@ -129,7 +145,7 @@ def wells(
 
 @router.get("/wells/{well_id}/analysis")
 def well_analysis(well_id: str, oil_price: float = Query(default=70.0, gt=0, le=300), threshold: float = Query(default=0.15, gt=0, lt=0.9)):
-    df = data_service.dataframe
+    df = _production_df()
     well_df = df[df["well_id"] == well_id]
     if well_df.empty:
         raise HTTPException(status_code=404, detail=f"Well {well_id} was not found.")
@@ -167,7 +183,7 @@ def basins():
 
 @router.get("/anomalies")
 def anomalies():
-    return analysis_service.anomaly_records(data_service.dataframe)
+    return analysis_service.anomaly_records(_production_df())
 
 
 @router.get("/interventions")

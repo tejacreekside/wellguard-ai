@@ -1,12 +1,11 @@
 # Deploy WellGuard AI Live
 
-Recommended live stack:
+Recommended free live stack:
 
 - Database: Neon Postgres
-- Backend: Render Web Service
-- Frontend: Vercel Vite app
+- Frontend and Backend: Vercel
 
-This keeps the backend, database, and frontend separately scalable while preserving the current monorepo.
+This deploys the React dashboard and FastAPI API from the same monorepo. Vercel hosts the Vite frontend and routes `/api/*` to the FastAPI Python function.
 
 ## 1. Create Neon Postgres
 
@@ -28,55 +27,27 @@ postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
 postgresql+psycopg2://USER:PASSWORD@HOST/DBNAME?sslmode=require
 ```
 
-## 2. Deploy Backend On Render
+## 2. Deploy Full App On Vercel
 
-1. Go to https://render.com.
-2. New → Blueprint.
-3. Connect GitHub repo: `tejacreekside/wellguard-ai`.
-4. Select the repo and let Render read `render.yaml`.
-5. Add this environment variable when prompted:
+1. Go to https://vercel.com.
+2. New Project.
+3. Import GitHub repo: `tejacreekside/wellguard-ai`.
+4. Keep the root directory as the repository root.
+5. Add this environment variable:
 
 ```text
 WELLGUARD_DATABASE_URL=<your Neon connection string>
 ```
 
-6. Deploy.
-
-Expected backend URL:
+6. Add this environment variable so the frontend calls the Vercel-hosted API:
 
 ```text
-https://wellguard-ai-api.onrender.com
+VITE_API_BASE_URL=/api
 ```
 
-Check:
+7. Deploy.
 
-```text
-https://wellguard-ai-api.onrender.com/health
-https://wellguard-ai-api.onrender.com/docs
-```
-
-## 3. Deploy Frontend On Vercel
-
-1. Go to https://vercel.com.
-2. New Project.
-3. Import GitHub repo: `tejacreekside/wellguard-ai`.
-4. Set **Root Directory** to:
-
-```text
-frontend
-```
-
-5. Set environment variable:
-
-```text
-VITE_API_BASE_URL=https://wellguard-ai-api.onrender.com
-```
-
-Use your actual Render backend URL.
-
-6. Deploy.
-
-Expected frontend URL:
+Expected live URL:
 
 ```text
 https://wellguard-ai.vercel.app
@@ -93,14 +64,14 @@ https://your-vercel-url.vercel.app
 Then verify API endpoints:
 
 ```text
-https://your-render-url.onrender.com/health
-https://your-render-url.onrender.com/portfolio/summary
-https://your-render-url.onrender.com/copilot/query?q=Which%20wells%20are%20highest%20risk%3F
+https://your-vercel-url.vercel.app/api/health
+https://your-vercel-url.vercel.app/api/portfolio/summary
+https://your-vercel-url.vercel.app/api/copilot/query?q=Which%20wells%20are%20highest%20risk%3F
 ```
 
 ## Notes
 
-- Render uses `/health` as the health check path.
 - Vercel requires `VITE_` prefix for Vite environment variables.
-- OCC/OTC upload remains available at `/ingestion/upload-occ-data`.
+- OCC/OTC upload remains available at `/api/ingestion/upload-occ-data`.
 - The app still falls back to generated Oklahoma-style production data if no uploaded public dataset exists.
+- Vercel Functions are serverless, so uploaded data is persisted to Neon Postgres rather than process memory.

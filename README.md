@@ -176,15 +176,17 @@ Services:
 
 ## Live Deployment
 
-Use [DEPLOYMENT.md](DEPLOYMENT.md) to deploy publicly with:
+Use [DEPLOYMENT.md](DEPLOYMENT.md) to deploy publicly on a free-friendly stack with:
 
 - Neon Postgres
-- Render FastAPI backend
 - Vercel React/Vite frontend
+- Vercel Python FastAPI functions under `/api`
 
 Deployment config is included in:
 
 - `render.yaml`
+- `vercel.json`
+- `api/index.py`
 - `frontend/vercel.json`
 - `backend/.env.example`
 - `frontend/.env.example`
