@@ -12,8 +12,17 @@ def arps_decline(t: np.ndarray, qi: float, di: float, b: float) -> np.ndarray:
     return qi / np.power(1 + b * di * np.maximum(t, 0), 1 / b)
 
 
+def exponential_decline(t: np.ndarray, qi: float, di: float) -> np.ndarray:
+    return qi * np.exp(-di * np.maximum(t, 0))
+
+
+def harmonic_decline(t: np.ndarray, qi: float, di: float) -> np.ndarray:
+    return qi / (1 + di * np.maximum(t, 0))
+
+
 @dataclass
 class DeclineModelResult:
+    model_name: str
     qi: float
     di: float
     b: float
@@ -30,10 +39,11 @@ class DeclineCurveModel:
         positive = y > 0
 
         if len(y) < 6:
-            return DeclineModelResult(float(max(y.max(initial=0), 1)), 0.05, 0.9, 0.0, False, "Too few data points for reliable curve fit.")
+            return DeclineModelResult("fallback", float(max(y.max(initial=0), 1)), 0.05, 0.9, 0.0, False, "Too few data points for reliable curve fit.")
         if positive.sum() < 4:
-            return DeclineModelResult(float(max(y.max(initial=0), 1)), 0.05, 0.9, 0.0, False, "Insufficient positive production history.")
+            return DeclineModelResult("fallback", float(max(y.max(initial=0), 1)), 0.05, 0.9, 0.0, False, "Insufficient positive production history.")
 
+        candidates: list[DeclineModelResult] = []
         try:
             popt, _ = curve_fit(
                 arps_decline,
@@ -45,14 +55,42 @@ class DeclineCurveModel:
             )
             expected = arps_decline(t[positive], *popt)
             r2 = float(r2_score(y[positive], expected)) if len(expected) > 1 else 0.0
-            return DeclineModelResult(float(popt[0]), float(popt[1]), float(popt[2]), max(min(r2, 1), -1), True, "Curve fit completed.")
-        except Exception as exc:
-            qi = float(max(y[positive].max(initial=0), 1))
-            return DeclineModelResult(qi, 0.05, 0.9, 0.0, False, f"Curve fit failed; fallback decline used: {exc}")
+            candidates.append(DeclineModelResult("hyperbolic", float(popt[0]), float(popt[1]), float(popt[2]), max(min(r2, 1), -1), True, "Hyperbolic curve fit completed."))
+        except Exception:
+            pass
+
+        for name, fn in [("exponential", exponential_decline), ("harmonic", harmonic_decline)]:
+            try:
+                popt, _ = curve_fit(
+                    fn,
+                    t[positive],
+                    y[positive],
+                    p0=[max(y[positive][0], y[positive].max()), 0.05],
+                    bounds=([1, 0.001], [50000, 0.35]),
+                    maxfev=20000,
+                )
+                expected = fn(t[positive], *popt)
+                r2 = float(r2_score(y[positive], expected)) if len(expected) > 1 else 0.0
+                candidates.append(DeclineModelResult(name, float(popt[0]), float(popt[1]), 1.0 if name == "harmonic" else 0.0, max(min(r2, 1), -1), True, f"{name.title()} curve fit completed."))
+            except Exception:
+                continue
+
+        if candidates:
+            return sorted(candidates, key=lambda result: result.r2, reverse=True)[0]
+        qi = float(max(y[positive].max(initial=0), 1))
+        return DeclineModelResult("fallback", qi, 0.05, 0.9, 0.0, False, "All decline fits failed; fallback decline used.")
 
     def expected(self, length: int, model: DeclineModelResult) -> np.ndarray:
-        return arps_decline(np.arange(length, dtype=float), model.qi, model.di, model.b)
+        t = np.arange(length, dtype=float)
+        return self._predict(t, model)
 
     def forecast(self, history_length: int, horizon_months: int, model: DeclineModelResult) -> np.ndarray:
         t = np.arange(history_length, history_length + horizon_months, dtype=float)
+        return self._predict(t, model)
+
+    def _predict(self, t: np.ndarray, model: DeclineModelResult) -> np.ndarray:
+        if model.model_name == "exponential":
+            return exponential_decline(t, model.qi, model.di)
+        if model.model_name == "harmonic":
+            return harmonic_decline(t, model.qi, model.di)
         return arps_decline(t, model.qi, model.di, model.b)

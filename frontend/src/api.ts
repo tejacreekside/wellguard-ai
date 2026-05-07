@@ -1,4 +1,4 @@
-import type { ExecutiveSummary, PortfolioSummary, Recommendation, WellAnalysis, WellSummary } from "./types";
+import type { AnomalyRecord, BasinSummary, CopilotResponse, ExecutiveSummary, OperatorRisk, PortfolioSummary, Recommendation, WellAnalysis, WellSummary } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -14,8 +14,13 @@ export const api = {
   portfolio: () => getJson<PortfolioSummary>("/portfolio/summary"),
   wells: () => getJson<WellSummary[]>("/wells"),
   recommendations: () => getJson<Recommendation[]>("/recommendations"),
+  operators: () => getJson<OperatorRisk[]>("/operators"),
+  basins: () => getJson<BasinSummary[]>("/basins"),
+  anomalies: () => getJson<AnomalyRecord[]>("/anomalies"),
   executive: () => getJson<ExecutiveSummary>("/executive-summary"),
+  executiveReportUrl: () => `${API_BASE}/executive/report`,
   wellAnalysis: (wellId: string) => getJson<WellAnalysis>(`/wells/${wellId}/analysis`),
+  copilot: (question: string) => getJson<CopilotResponse>(`/copilot/query?q=${encodeURIComponent(question)}`),
   reportUrl: () => `${API_BASE}/reports/intervention-report.csv`,
   upload: async (file: File) => {
     const formData = new FormData();

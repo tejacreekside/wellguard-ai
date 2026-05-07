@@ -2,6 +2,10 @@
 
 AI-native operational intelligence for oil and gas production.
 
+## Phase 2 Upgrade
+
+WellGuard AI has been upgraded from a synthetic MVP into a real-data-ready industrial AI platform. It now supports OCC/OTC-style public Oklahoma well production exports, Postgres-backed normalized storage, multi-model decline analytics, anomaly intelligence, expanded agent orchestration, and a deterministic RAG copilot.
+
 WellGuard AI detects abnormal production decline, forecasts future output, estimates preventable revenue leakage, ranks wells by urgency, and generates explainable intervention recommendations for operations leaders.
 
 This is built as an AI infrastructure product, not a passive dashboard. The system combines time-series modeling, anomaly detection, financial impact modeling, and deterministic agent workflows to turn production data into operational decisions.
@@ -42,6 +46,15 @@ WellGuard AI is not a charting project. It behaves like an operational intellige
 - Explainable recommendation logic for industrial decision-support.
 - Full-stack AI product architecture with FastAPI, React, Plotly, Docker, and tests.
 
+## Public Data Sources
+
+Oklahoma public oil and gas data is fragmented across OCC and OTC workflows. WellGuard AI is built to ingest real exported CSV/Excel files from these public workflows rather than depend on a single brittle scraper.
+
+- OCC Oil & Gas Data Files: https://oklahoma.gov/occ/divisions/oil-gas/oil-gas-data.html
+- OCC GIS Data and Maps: https://aem-prod.oklahoma.gov/occ/divisions/oil-gas/gis-data-and-maps.html
+- OCC Well Data Finder: https://oklahoma.gov/occ/divisions/oil-gas/database-search-imaged-documents/occ-well-data-finder.html
+- OCC notes that crude oil and natural gas production records are officially handled through the Oklahoma Tax Commission workflow.
+
 ## Architecture
 
 ```text
@@ -72,6 +85,11 @@ Agent modules:
 - `RevenueLeakageAgent`
 - `InterventionAdvisorAgent`
 - `ExecutiveSummaryAgent`
+- `BasinBenchmarkAgent`
+- `PortfolioRiskAgent`
+- `DataQualityAgent`
+- `ForecastValidationAgent`
+- `OperatorComparisonAgent`
 
 The agents receive and return structured data. They do not require an LLM. If an LLM key is later added, it should only polish summaries, not replace the deterministic operating logic.
 
@@ -121,6 +139,28 @@ cd backend
 python3 -m app.data.sample_generator
 ```
 
+## Real OCC/OTC Ingestion
+
+Upload real public production exports with:
+
+```text
+POST /ingestion/upload-occ-data
+```
+
+Accepted formats:
+
+- CSV
+- Excel `.xlsx` / `.xls`
+
+The ETL layer maps common OCC/OTC-style aliases into this internal schema:
+
+```text
+well_id, api_number, operator_name, basin, formation, county, state,
+production_date, oil_bbl, gas_mcf, water_bbl, status, latitude, longitude
+```
+
+The normalizer handles malformed rows, missing identifiers, duplicate well/month records, inactive wells, inconsistent operator names, null production, bad dates, corrupted numeric values, and negative production values. It returns a data quality score and warnings.
+
 ## Run With Docker
 
 ```bash
@@ -132,6 +172,7 @@ Services:
 - Backend API: `http://localhost:8000`
 - Frontend dashboard: `http://localhost:5173`
 - API docs: `http://localhost:8000/docs`
+- PostgreSQL: `localhost:5432`
 
 ## Local Development
 
@@ -163,6 +204,17 @@ npm run dev
 - `GET /recommendations`
 - `GET /executive-summary`
 - `GET /reports/intervention-report.csv`
+- `GET /operators`
+- `GET /operators/{operator_name}/risk`
+- `GET /basins`
+- `GET /anomalies`
+- `GET /interventions`
+- `GET /portfolio/risk`
+- `GET /copilot/query`
+- `POST /copilot/query`
+- `POST /ingestion/upload-occ-data`
+- `GET /forecast/confidence`
+- `GET /executive/report`
 
 Upload CSV columns:
 
@@ -179,6 +231,24 @@ q(t) = qi / (1 + b * Di * t)^(1/b)
 ```
 
 It compares latest actual oil production against expected production and flags wells below expected output by a configurable threshold. Default threshold is 15%.
+
+Phase 2 model selection fits and compares:
+
+- Hyperbolic decline
+- Exponential decline
+- Harmonic decline
+
+The engine selects the best R² fit, emits confidence scores, and runs rolling trend analysis.
+
+Detected patterns:
+
+- Sudden drops
+- Accelerated decline
+- Abnormal flattening
+- Intermittent production
+- Potential artificial lift issues
+- Shut-in behavior
+- High-water anomalies
 
 Revenue leakage:
 
@@ -215,6 +285,14 @@ The React dashboard includes:
 - Intervention Priority Table
 - Downloadable CSV report
 - CSV upload workflow
+- Interactive Oklahoma well map
+- Basin heatmap
+- Operator comparison charts
+- AI anomaly timeline
+- Forecast confidence and model mix
+- AI Operational Copilot
+- Architecture and agent workflow section
+- Executive HTML report
 
 Screenshot targets after running locally:
 
@@ -237,6 +315,11 @@ Current coverage includes:
 - Abnormal decline detection
 - Revenue leakage calculation
 - Recommendation decision-support logic
+- OCC/OTC ETL normalization
+- Malformed public export handling
+- Phase 2 anomaly detection
+- Agent orchestration
+- Deterministic RAG copilot retrieval
 
 Frontend build:
 
@@ -256,6 +339,25 @@ WellGuard AI demonstrates applied AI engineering beyond prompt wrapping:
 - Explainable AI recommendations.
 - Executive-grade frontend product thinking.
 - Dockerized full-stack delivery.
+- Real-data ETL and normalization.
+- Postgres-ready operational storage.
+- Deterministic RAG copilot that works without an API key.
+
+## System Design Decisions
+
+- Preserve deterministic core intelligence so the platform works without an LLM.
+- Use LLMs only as optional summary polishers, never as the source of operational truth.
+- Normalize public OCC/OTC exports through alias mapping because public files vary by source and date.
+- Keep model services independent from API routes so agents, tests, and future batch jobs can reuse them.
+- Use PostgreSQL in Docker while retaining SQLite/local fallback for developer ergonomics.
+
+## Scalability Considerations
+
+- Production history is indexed by well and production month.
+- Forecast, anomaly, and recommendation tables are separated for model lineage.
+- TimescaleDB hypertables can be enabled later for high-volume monthly production history.
+- Copilot retrieval is deterministic locally today and can be swapped to FAISS/Chroma plus OpenAI embeddings later.
+- Agent outputs are structured, logged, confidence-scored, and independently testable.
 
 LinkedIn framing:
 

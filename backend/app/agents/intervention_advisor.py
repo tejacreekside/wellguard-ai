@@ -22,6 +22,10 @@ class InterventionAdvisorAgent(Agent[list[WellSummary], list[Recommendation]]):
                     rationale=self._rationale(well),
                     suggested_next_step=self._next_step(well.recommendation_category),
                     decision_support_notice=NOTICE,
+                    expected_recovery_bbl_month=round(max(well.expected_oil_bbl - well.latest_oil_bbl, 0) * 0.35, 1),
+                    estimated_roi=round(max(well.revenue_leakage_daily * 90 / 25000, 0), 2),
+                    payback_days=round(25000 / max(well.revenue_leakage_daily, 1), 1),
+                    confidence_score=min(95, max(45, well.confidence_score)),
                 )
             )
         return recommendations
@@ -30,7 +34,9 @@ class InterventionAdvisorAgent(Agent[list[WellSummary], list[Recommendation]]):
         gap = round(well.variance_pct * 100, 1)
         return (
             f"{well.well_id} is {gap}% below expected production with "
-            f"${well.revenue_leakage_daily:,.0f}/day estimated leakage and risk score {well.risk_score}."
+            f"${well.revenue_leakage_daily:,.0f}/day estimated leakage and risk score {well.risk_score}. "
+            f"Recommendation generated because production is below the {well.decline_model} curve"
+            + (f" with anomaly signals: {', '.join(well.anomaly_types)}." if well.anomaly_types else ".")
         )
 
     def _next_step(self, category: str) -> str:

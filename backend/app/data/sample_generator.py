@@ -15,6 +15,7 @@ OPERATORS = [
 ]
 BASINS = ["SCOOP", "STACK", "Anadarko"]
 FORMATIONS = ["Woodford", "Springer", "Meramec", "Osage"]
+COUNTIES = ["Kingfisher", "Canadian", "Grady", "Stephens", "Blaine", "Caddo"]
 
 
 def arps(qi: float, di: float, b: float, t: np.ndarray) -> np.ndarray:
@@ -33,6 +34,10 @@ def generate_sample_production_data(wells: int = 30, months: int = 36, seed: int
         operator = OPERATORS[idx % len(OPERATORS)]
         basin = BASINS[idx % len(BASINS)]
         formation = FORMATIONS[idx % len(FORMATIONS)]
+        county = COUNTIES[idx % len(COUNTIES)]
+        api_number = f"35{rng.integers(1, 153):03d}{rng.integers(10000, 99999)}"
+        latitude = float(rng.uniform(34.6, 36.6))
+        longitude = float(rng.uniform(-99.2, -96.0))
         qi = float(rng.uniform(4200, 12500))
         di = float(rng.uniform(0.035, 0.09))
         b = float(rng.uniform(0.55, 1.25))
@@ -68,14 +73,19 @@ def generate_sample_production_data(wells: int = 30, months: int = 36, seed: int
             rows.append(
                 {
                     "well_id": well_id,
+                    "api_number": api_number,
                     "operator_name": operator,
                     "basin": basin,
                     "formation": formation,
+                    "county": county,
+                    "state": "OK",
                     "production_date": (start + pd.DateOffset(months=month)).date().isoformat(),
                     "oil_bbl": round(float(oil[month]) if not np.isnan(oil[month]) else np.nan, 2),
                     "gas_mcf": round(float(gas[month]), 2),
                     "water_bbl": round(float(water[month]), 2),
                     "status": status,
+                    "latitude": round(latitude + float(rng.normal(0, 0.015)), 6),
+                    "longitude": round(longitude + float(rng.normal(0, 0.015)), 6),
                 }
             )
 

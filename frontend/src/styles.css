@@ -218,6 +218,59 @@ table {
   font-size: 14px;
 }
 
+.copilot-input {
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.copilot-input input {
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: #101d30;
+  color: #f8fafc;
+  padding: 0 12px;
+}
+
+.copilot-input button {
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  background: rgba(14, 165, 233, 0.18);
+  color: #e0f2fe;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.copilot p, .architecture p {
+  color: #cbd5e1;
+}
+
+.copilot small {
+  color: #93c5fd;
+}
+
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.pipeline span {
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 8px;
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: #dbeafe;
+  background: rgba(15, 23, 42, 0.65);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 th, td {
   border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   padding: 12px 10px;

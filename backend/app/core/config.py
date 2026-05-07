@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     default_oil_price: float = 70.0
     default_decline_threshold: float = 0.15
     database_url: str = "sqlite:///./wellguard.db"
+    local_database_url: str = "sqlite:///./wellguard.db"
     data_dir: Path = Path(__file__).resolve().parents[3] / "data"
     optional_openai_api_key: Optional[str] = None
 

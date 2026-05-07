@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.core.config import get_settings
+from app.services.persistence_service import persistence_service
 
 
 settings = get_settings()
@@ -21,3 +22,8 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix=settings.api_prefix)
+
+
+@app.on_event("startup")
+def startup() -> None:
+    persistence_service.init_db()

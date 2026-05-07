@@ -7,7 +7,7 @@ import pandas as pd
 
 from app.core.config import get_settings
 from app.data.sample_generator import generate_sample_production_data, write_sample_csv
-from app.models.schemas import REQUIRED_COLUMNS
+from app.models.schemas import INTERNAL_COLUMNS, REQUIRED_COLUMNS
 
 
 @dataclass
@@ -66,12 +66,24 @@ class ProductionDataService:
         if missing:
             raise ValueError(f"CSV is missing required columns: {', '.join(missing)}")
 
-        df = df[list(REQUIRED_COLUMNS)].copy()
+        for optional, default in {
+            "api_number": "",
+            "county": "Unknown",
+            "state": "OK",
+            "latitude": pd.NA,
+            "longitude": pd.NA,
+        }.items():
+            if optional not in df.columns:
+                df[optional] = default
+        df = df[[c for c in INTERNAL_COLUMNS if c in df.columns]].copy()
         for col in ["operator_name", "basin", "formation", "status"]:
             blank_count = df[col].isna().sum() + (df[col].astype(str).str.strip() == "").sum()
             if blank_count:
                 warnings.append(f"Filled {int(blank_count)} missing {col} values.")
             df[col] = df[col].fillna("Unknown").astype(str).str.strip().replace("", "Unknown")
+        df["county"] = df["county"].fillna("Unknown").astype(str).str.strip().replace("", "Unknown")
+        df["state"] = df["state"].fillna("OK").astype(str).str.strip().replace("", "OK")
+        df["api_number"] = df["api_number"].fillna("").astype(str).str.strip()
 
         df["well_id"] = df["well_id"].astype(str).str.strip()
         df = df[df["well_id"] != ""]
@@ -81,12 +93,14 @@ class ProductionDataService:
             warnings.append(f"Dropped {bad_dates} rows with malformed dates.")
             df = df.dropna(subset=["production_date"])
 
-        for col in ["oil_bbl", "gas_mcf", "water_bbl"]:
+        for col in ["oil_bbl", "gas_mcf", "water_bbl", "latitude", "longitude"]:
             df[col] = pd.to_numeric(df[col], errors="coerce")
             missing_values = int(df[col].isna().sum())
-            if missing_values:
+            if missing_values and col in {"oil_bbl", "gas_mcf", "water_bbl"}:
                 warnings.append(f"Converted {missing_values} missing/non-numeric {col} values to 0.")
-            df[col] = df[col].fillna(0.0)
+            df[col] = df[col].fillna(0.0 if col in {"oil_bbl", "gas_mcf", "water_bbl"} else pd.NA)
+            if col in {"latitude", "longitude"}:
+                continue
             negatives = int((df[col] < 0).sum())
             if negatives:
                 warnings.append(f"Clipped {negatives} negative {col} values to 0.")
@@ -99,12 +113,17 @@ class ProductionDataService:
             df.groupby(["well_id", "production_date"], as_index=False)
             .agg(
                 operator_name=("operator_name", "first"),
+                api_number=("api_number", "first"),
                 basin=("basin", "first"),
                 formation=("formation", "first"),
+                county=("county", "first"),
+                state=("state", "first"),
                 oil_bbl=("oil_bbl", "sum"),
                 gas_mcf=("gas_mcf", "sum"),
                 water_bbl=("water_bbl", "sum"),
                 status=("status", "last"),
+                latitude=("latitude", "first"),
+                longitude=("longitude", "first"),
             )
             .sort_values(["well_id", "production_date"])
         )
@@ -119,7 +138,10 @@ class ProductionDataService:
         if clipped:
             warnings.append(f"Clipped {clipped} extreme oil outliers.")
 
-        return DataLoadResult(df.reset_index(drop=True), warnings)
+        for col in INTERNAL_COLUMNS:
+            if col not in df.columns:
+                df[col] = pd.NA
+        return DataLoadResult(df[INTERNAL_COLUMNS].reset_index(drop=True), warnings)
 
 
 data_service = ProductionDataService()

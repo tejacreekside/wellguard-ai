@@ -1,9 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { Activity, AlertTriangle, BarChart3, BrainCircuit, Download, Factory, FileUp, Gauge, ShieldCheck, TrendingDown } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, BrainCircuit, Download, Factory, FileUp, Gauge, GitBranch, Map, Network, Send, ShieldCheck, TrendingDown } from "lucide-react";
 import Plot from "react-plotly.js";
 import { api } from "./api";
-import type { ExecutiveSummary, PortfolioSummary, Recommendation, WellAnalysis, WellSummary } from "./types";
+import type { AnomalyRecord, BasinSummary, CopilotResponse, ExecutiveSummary, OperatorRisk, PortfolioSummary, Recommendation, WellAnalysis, WellSummary } from "./types";
 import "./styles.css";
 
 function formatMoney(value: number) {
@@ -15,6 +15,11 @@ function App() {
   const [wells, setWells] = React.useState<WellSummary[]>([]);
   const [recommendations, setRecommendations] = React.useState<Recommendation[]>([]);
   const [executive, setExecutive] = React.useState<ExecutiveSummary | null>(null);
+  const [operatorRisk, setOperatorRisk] = React.useState<OperatorRisk[]>([]);
+  const [basinRisk, setBasinRisk] = React.useState<BasinSummary[]>([]);
+  const [anomalies, setAnomalies] = React.useState<AnomalyRecord[]>([]);
+  const [copilotQuestion, setCopilotQuestion] = React.useState("Which wells are highest risk?");
+  const [copilotAnswer, setCopilotAnswer] = React.useState<CopilotResponse | null>(null);
   const [selectedWell, setSelectedWell] = React.useState<string>("");
   const [analysis, setAnalysis] = React.useState<WellAnalysis | null>(null);
   const [operator, setOperator] = React.useState("All");
@@ -25,11 +30,14 @@ function App() {
   const load = React.useCallback(async () => {
     try {
       setError("");
-      const [p, w, r, e] = await Promise.all([api.portfolio(), api.wells(), api.recommendations(), api.executive()]);
+      const [p, w, r, e, o, b, a] = await Promise.all([api.portfolio(), api.wells(), api.recommendations(), api.executive(), api.operators(), api.basins(), api.anomalies()]);
       setPortfolio(p);
       setWells(w);
       setRecommendations(r);
       setExecutive(e);
+      setOperatorRisk(o);
+      setBasinRisk(b);
+      setAnomalies(a);
       setSelectedWell((current) => current || w[0]?.well_id || "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load WellGuard AI data.");
@@ -71,6 +79,8 @@ function App() {
           <span><Gauge size={18} /> Overview</span>
           <span><TrendingDown size={18} /> Decline Intelligence</span>
           <span><BrainCircuit size={18} /> Agent Brief</span>
+          <span><Map size={18} /> Basin Intelligence</span>
+          <span><Network size={18} /> Architecture</span>
           <span><Factory size={18} /> Intervention Queue</span>
         </nav>
         <label className="upload">
@@ -79,6 +89,7 @@ function App() {
           <input type="file" accept=".csv" onChange={handleUpload} />
         </label>
         <a className="download" href={api.reportUrl()}><Download size={18} /> CSV Report</a>
+        <a className="download" href={api.executiveReportUrl()} target="_blank"><Download size={18} /> Executive Report</a>
       </aside>
 
       <section className="content">
@@ -100,7 +111,11 @@ function App() {
           <Kpi icon={<ShieldCheck />} label="Portfolio Health" value={`${portfolio?.portfolio_health_score ?? "--"}/100`} />
           <Kpi icon={<Activity />} label="Flagged Wells" value={`${portfolio?.flagged_well_count ?? "--"}/${portfolio?.well_count ?? "--"}`} />
           <Kpi icon={<TrendingDown />} label="Daily Leakage" value={formatMoney(portfolio?.total_daily_revenue_leakage ?? 0)} />
-          <Kpi icon={<BarChart3 />} label="30-Day Exposure" value={formatMoney(portfolio?.estimated_30_day_leakage ?? 0)} />
+          <Kpi icon={<BarChart3 />} label="Annual Leakage" value={formatMoney(portfolio?.estimated_annual_leakage ?? 0)} />
+          <Kpi icon={<Gauge />} label="Portfolio Risk" value={`${portfolio?.portfolio_risk_score ?? "--"}/100`} />
+          <Kpi icon={<Activity />} label="Stability" value={`${portfolio?.production_stability_score ?? "--"}/100`} />
+          <Kpi icon={<Factory />} label="Operator Efficiency" value={`${portfolio?.operator_efficiency_index ?? "--"}/100`} />
+          <Kpi icon={<TrendingDown />} label="ROI Potential" value={`${portfolio?.intervention_roi_potential ?? "--"}x`} />
         </section>
 
         <section className="grid two">
@@ -115,6 +130,48 @@ function App() {
             <Plot
               data={[{ type: "bar", x: filtered.slice(0, 10).map((w) => w.well_id), y: filtered.slice(0, 10).map((w) => w.revenue_leakage_daily), marker: { color: "#f97316" } }]}
               layout={plotLayout("Estimated $/day leakage")}
+              config={{ displayModeBar: false, responsive: true }}
+              className="plot"
+            />
+          </article>
+        </section>
+
+        <section className="grid two">
+          <article className="panel">
+            <div className="panel-title"><Map size={20} />Geographic Well Risk Map</div>
+            <Plot
+              data={[{ type: "scattermap", lat: filtered.map((w) => w.latitude), lon: filtered.map((w) => w.longitude), text: filtered.map((w) => `${w.well_id} risk ${w.risk_score}`), marker: { size: filtered.map((w) => Math.max(8, w.risk_score / 5)), color: filtered.map((w) => w.risk_score), colorscale: "Portland", showscale: true } }]}
+              layout={{ ...plotLayout("Oklahoma well risk"), map: { style: "open-street-map", zoom: 5.4, center: { lat: 35.6, lon: -97.7 } } }}
+              config={{ displayModeBar: false, responsive: true }}
+              className="plot"
+            />
+          </article>
+          <article className="panel">
+            <div className="panel-title"><AlertTriangle size={20} />AI Anomaly Timeline</div>
+            <Plot
+              data={[{ type: "scatter", mode: "markers", x: anomalies.map((a) => a.production_date), y: anomalies.map((a) => a.well_id), text: anomalies.map((a) => `${a.anomaly_type}: ${a.explanation}`), marker: { size: anomalies.map((a) => Math.max(8, a.severity / 5)), color: anomalies.map((a) => a.severity), colorscale: "YlOrRd" } }]}
+              layout={plotLayout("Anomaly severity by month")}
+              config={{ displayModeBar: false, responsive: true }}
+              className="plot"
+            />
+          </article>
+        </section>
+
+        <section className="grid two">
+          <article className="panel">
+            <div className="panel-title"><Factory size={20} />Operator Comparison</div>
+            <Plot
+              data={[{ type: "bar", x: operatorRisk.map((o) => o.operator_name), y: operatorRisk.map((o) => o.daily_revenue_leakage), marker: { color: "#38bdf8" } }]}
+              layout={plotLayout("Operator leakage exposure")}
+              config={{ displayModeBar: false, responsive: true }}
+              className="plot"
+            />
+          </article>
+          <article className="panel">
+            <div className="panel-title"><BarChart3 size={20} />Basin Benchmark Heatmap</div>
+            <Plot
+              data={[{ type: "heatmap", x: basinRisk.map((b) => b.basin), y: ["Risk", "Leakage", "Stability"], z: [basinRisk.map((b) => b.average_risk_score), basinRisk.map((b) => b.daily_revenue_leakage / 100), basinRisk.map((b) => b.production_stability_score)], colorscale: "Viridis" }]}
+              layout={plotLayout("Basin intelligence")}
               config={{ displayModeBar: false, responsive: true }}
               className="plot"
             />
@@ -140,14 +197,33 @@ function App() {
           </article>
         </section>
 
+        <section className="grid two">
+          <article className="panel copilot">
+            <div className="panel-title"><BrainCircuit size={20} />AI Operational Copilot</div>
+            <div className="copilot-input">
+              <input value={copilotQuestion} onChange={(e) => setCopilotQuestion(e.target.value)} />
+              <button onClick={async () => setCopilotAnswer(await api.copilot(copilotQuestion))}><Send size={18} /></button>
+            </div>
+            <p>{copilotAnswer?.answer ?? "Ask about highest risk wells, abnormal decline in a basin, operator leakage, interventions, or next-quarter forecasts."}</p>
+            <small>{copilotAnswer ? `Confidence ${copilotAnswer.confidence_score}/100 using ${copilotAnswer.mode}` : "Deterministic RAG fallback, OpenAI optional."}</small>
+          </article>
+          <article className="panel architecture">
+            <div className="panel-title"><GitBranch size={20} />AI Pipeline Architecture</div>
+            <div className="pipeline">
+              <span>OCC/OTC ETL</span><span>Quality Scoring</span><span>Decline Models</span><span>Anomaly Engine</span><span>Agent Orchestrator</span><span>Copilot RAG</span>
+            </div>
+            <p>Forecasting, anomaly detection, intervention ROI, and executive intelligence run as structured services behind FastAPI.</p>
+          </article>
+        </section>
+
         <section className="panel">
           <div className="panel-title"><AlertTriangle size={20} />Intervention Priority Table</div>
           <table>
-            <thead><tr><th>Well</th><th>Priority</th><th>Category</th><th>Risk</th><th>Leakage</th><th>Rationale</th></tr></thead>
+            <thead><tr><th>Well</th><th>Priority</th><th>Category</th><th>Risk</th><th>Leakage</th><th>ROI</th><th>Rationale</th></tr></thead>
             <tbody>
               {recommendations.slice(0, 12).map((rec) => {
                 const well = wells.find((w) => w.well_id === rec.well_id);
-                return <tr key={rec.well_id}><td>{rec.well_id}</td><td><span className={`pill ${rec.priority.toLowerCase()}`}>{rec.priority}</span></td><td>{rec.category}</td><td>{well?.risk_score}</td><td>{formatMoney(well?.revenue_leakage_daily ?? 0)}</td><td>{rec.rationale}</td></tr>;
+                return <tr key={rec.well_id}><td>{rec.well_id}</td><td><span className={`pill ${rec.priority.toLowerCase()}`}>{rec.priority}</span></td><td>{rec.category}</td><td>{well?.risk_score}</td><td>{formatMoney(well?.revenue_leakage_daily ?? 0)}</td><td>{rec.estimated_roi}x</td><td>{rec.rationale}</td></tr>;
               })}
             </tbody>
           </table>
