@@ -174,6 +174,21 @@ Services:
 - API docs: `http://localhost:8000/docs`
 - PostgreSQL: `localhost:5432`
 
+## Live Deployment
+
+Use [DEPLOYMENT.md](DEPLOYMENT.md) to deploy publicly with:
+
+- Neon Postgres
+- Render FastAPI backend
+- Vercel React/Vite frontend
+
+Deployment config is included in:
+
+- `render.yaml`
+- `frontend/vercel.json`
+- `backend/.env.example`
+- `frontend/.env.example`
+
 ## Local Development
 
 Backend:

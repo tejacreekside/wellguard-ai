@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: wellguard-ai-api
+    runtime: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: WELLGUARD_DEFAULT_OIL_PRICE
+        value: "70"
+      - key: WELLGUARD_DATA_DIR
+        value: /opt/render/project/src/backend/data
+      - key: WELLGUARD_DATABASE_URL
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.12.7
