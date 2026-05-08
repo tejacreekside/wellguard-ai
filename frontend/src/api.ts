@@ -1,13 +1,52 @@
 import type { AnomalyRecord, BasinSummary, CopilotResponse, ExecutiveSummary, OperatorRisk, PortfolioSummary, Recommendation, WellAnalysis, WellSummary } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+const REQUEST_TIMEOUT_MS = 15000;
+const rawApiBase = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+const API_BASE = normalizeApiBase(rawApiBase);
+
+function normalizeApiBase(value: string) {
+  const trimmed = value.trim().replace(/\/+$/, "");
+  if (!trimmed || trimmed.includes("your-wellguard-api")) {
+    return "/api";
+  }
+  return trimmed;
+}
 
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`);
+  const url = `${API_BASE}${path}`;
+  const response = await fetchWithTimeout(url);
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw new Error(`API request failed (${response.status}) for ${url}: ${await responseError(response)}`);
   }
   return response.json();
+}
+
+async function fetchWithTimeout(url: string, options?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(`API request timed out after ${REQUEST_TIMEOUT_MS / 1000}s for ${url}`);
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function responseError(response: Response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const payload = await response.json().catch(() => null);
+    if (payload?.detail) {
+      return typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail);
+    }
+    return JSON.stringify(payload);
+  }
+  const text = await response.text();
+  return text.trim().slice(0, 300) || response.statusText;
 }
 
 export const api = {
@@ -25,9 +64,10 @@ export const api = {
   upload: async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    const response = await fetch(`${API_BASE}/upload-production-data`, { method: "POST", body: formData });
+    const url = `${API_BASE}/upload-production-data`;
+    const response = await fetchWithTimeout(url, { method: "POST", body: formData });
     if (!response.ok) {
-      throw new Error(await response.text());
+      throw new Error(`API request failed (${response.status}) for ${url}: ${await responseError(response)}`);
     }
     return response.json();
   },

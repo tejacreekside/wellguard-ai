@@ -23,6 +23,9 @@ app.add_middleware(
 
 app.include_router(router, prefix=settings.api_prefix)
 
+if settings.api_prefix.rstrip("/") != "/api":
+    app.include_router(router, prefix="/api")
+
 
 @app.on_event("startup")
 def startup() -> None:

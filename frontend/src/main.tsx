@@ -28,19 +28,24 @@ function App() {
   const [error, setError] = React.useState("");
 
   const load = React.useCallback(async () => {
-    try {
-      setError("");
-      const [p, w, r, e, o, b, a] = await Promise.all([api.portfolio(), api.wells(), api.recommendations(), api.executive(), api.operators(), api.basins(), api.anomalies()]);
-      setPortfolio(p);
-      setWells(w);
-      setRecommendations(r);
-      setExecutive(e);
-      setOperatorRisk(o);
-      setBasinRisk(b);
-      setAnomalies(a);
-      setSelectedWell((current) => current || w[0]?.well_id || "");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load WellGuard AI data.");
+    setError("");
+    const [p, w, r, e, o, b, a] = await Promise.allSettled([api.portfolio(), api.wells(), api.recommendations(), api.executive(), api.operators(), api.basins(), api.anomalies()]);
+
+    if (p.status === "fulfilled") setPortfolio(p.value);
+    if (w.status === "fulfilled") {
+      setWells(w.value);
+      setSelectedWell((current) => current || w.value[0]?.well_id || "");
+    }
+    if (r.status === "fulfilled") setRecommendations(r.value);
+    if (e.status === "fulfilled") setExecutive(e.value);
+    if (o.status === "fulfilled") setOperatorRisk(o.value);
+    if (b.status === "fulfilled") setBasinRisk(b.value);
+    if (a.status === "fulfilled") setAnomalies(a.value);
+
+    const failures = [p, w, r, e, o, b, a].filter((result) => result.status === "rejected");
+    if (failures.length) {
+      const firstFailure = failures[0] as PromiseRejectedResult;
+      setError(firstFailure.reason instanceof Error ? firstFailure.reason.message : "Some WellGuard AI data did not load.");
     }
   }, []);
 
